@@ -50,7 +50,7 @@ export async function getChatState() {
   const messages = await db.select().from(chatMessages)
     .where(eq(chatMessages.sessionId, session.id))
     .orderBy(asc(chatMessages.id));
-  return { session: { id: session.id, startedAt: session.startedAt, expiresAt: session.expiresAt }, messages };
+  return { session: { id: session.id, startedAt: session.startedAt, expiresAt: session.expiresAt }, messages: messages.map(normalizeMediaUrl) };
 }
 
 export async function postChatMessage(payload: ChatPayload) {
@@ -85,7 +85,7 @@ export async function postChatMessage(payload: ChatPayload) {
     mediaUrl: mediaUrl ?? null, mediaName: mediaName ?? null, mediaType: mediaType ?? null,
   });
   const created = await db.select().from(chatMessages).where(eq(chatMessages.sessionId, session.id)).orderBy(asc(chatMessages.id));
-  const message = created[created.length - 1];
+  const message = normalizeMediaUrl(created[created.length - 1]);
   broadcast({ type: "message", message });
   return message;
 }
@@ -95,9 +95,17 @@ export async function getMessagesSince(afterId: number) {
   if (!db) throw new Error("Database is not available");
   const session = await activeSession();
   if (!session) throw new Error("Unable to create chat session");
-  return db.select().from(chatMessages)
+  const messages = await db.select().from(chatMessages)
     .where(and(eq(chatMessages.sessionId, session.id), gt(chatMessages.id, afterId)))
     .orderBy(asc(chatMessages.id));
+  return messages.map(normalizeMediaUrl);
+}
+
+function normalizeMediaUrl(message: typeof chatMessages.$inferSelect) {
+  if (message?.mediaUrl?.startsWith("/manus-storage/")) {
+    return { ...message, mediaUrl: `/api/chat/media?key=${encodeURIComponent(message.mediaUrl.slice("/manus-storage/".length))}` };
+  }
+  return message;
 }
 
 export function addSubscriber(res: Response) {

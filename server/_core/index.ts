@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { addSubscriber, getChatState, getMessagesSince, postChatMessage } from "../chat";
+import { storageGetSignedUrl } from "../storage";
 
 async function startServer() {
   const app = express();
@@ -26,6 +27,13 @@ async function startServer() {
     try { res.json({ messages: await getMessagesSince(Number(req.query.afterId || 0)) }); } catch (error) { res.status(500).json({ error: String(error) }); }
   });
   app.get("/api/chat/stream", (_req, res) => addSubscriber(res));
+  app.get("/api/chat/media", async (req, res) => {
+    try {
+      const key = String(req.query.key || "").replace(/^\/+/, "");
+      if (!key || key.includes("..")) return res.status(400).json({ error: "Invalid media key" });
+      res.redirect(307, await storageGetSignedUrl(key));
+    } catch (error) { res.status(404).json({ error: "Media not found" }); }
+  });
   app.post("/api/chat", async (req, res) => {
     try { res.json({ message: await postChatMessage(req.body) }); } catch (error) { res.status(400).json({ error: String(error).replace(/^Error: /, "") }); }
   });
