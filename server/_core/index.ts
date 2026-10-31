@@ -7,6 +7,7 @@ import { publicPlatformScript } from "./publicConfig";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { addSubscriber, getChatState, getMessagesSince, postChatMessage } from "../chat";
 
 async function startServer() {
   const app = express();
@@ -17,6 +18,16 @@ async function startServer() {
   app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
   app.get("/api/platform/config.js", (_req, res) => {
     res.set("Cache-Control", "no-store").type("application/javascript").send(publicPlatformScript());
+  });
+  app.get("/api/chat", async (_req, res) => {
+    try { res.json(await getChatState()); } catch (error) { res.status(500).json({ error: String(error) }); }
+  });
+  app.get("/api/chat/messages", async (req, res) => {
+    try { res.json({ messages: await getMessagesSince(Number(req.query.afterId || 0)) }); } catch (error) { res.status(500).json({ error: String(error) }); }
+  });
+  app.get("/api/chat/stream", (_req, res) => addSubscriber(res));
+  app.post("/api/chat", async (req, res) => {
+    try { res.json({ message: await postChatMessage(req.body) }); } catch (error) { res.status(400).json({ error: String(error).replace(/^Error: /, "") }); }
   });
   registerOAuthRoutes(app);
   // tRPC API
