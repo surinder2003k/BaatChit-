@@ -23,7 +23,7 @@ export default function Home() {
   const [attachments, setAttachments] = useState<Attachment[]>([]); const [lightboxIndex, setLightboxIndex] = useState<number | null>(null); const [zoom, setZoom] = useState(1);
   const [reply, setReply] = useState<Reply | null>(null); const [menuMessage, setMenuMessage] = useState<number | null>(null); const [emojiOpen, setEmojiOpen] = useState(false);
   const [countdown, setCountdown] = useState("24h 00m 00s"); const [sending, setSending] = useState(false); const [error, setError] = useState("");
-  const endRef = useRef<HTMLDivElement>(null); const inputRef = useRef<HTMLInputElement>(null); const touchStart = useRef<{ id: number; x: number } | null>(null);
+  const endRef = useRef<HTMLDivElement>(null); const inputRef = useRef<HTMLInputElement>(null); const touchStart = useRef<{ id: number; x: number } | null>(null); const pressTimer = useRef<number | null>(null);
 
   const load = async () => { const response = await fetch("/api/chat", { cache: "no-store" }); if (!response.ok) throw new Error("Chat could not load"); setState(await response.json()); };
   useEffect(() => { load().catch(e => setError(e.message)); }, []);
@@ -58,7 +58,7 @@ export default function Home() {
     <section className="chat-window" aria-label="Chat messages">
       <div className="message-list">
         {!state?.messages.length && <div className="empty-state"><div className="empty-icon"><Zap size={20} /></div><h2>The room is quiet.</h2><p>Say hello — your message will appear here for everyone.</p></div>}
-        {state?.messages.map(message => <article className={`message ${message.senderName === name ? "mine" : ""}`} key={message.id} onTouchStart={event => { touchStart.current = { id: message.id, x: event.changedTouches[0].clientX }; }} onTouchEnd={event => { const start = touchStart.current; if (start?.id === message.id && Math.abs(event.changedTouches[0].clientX - start.x) > 55) startReply(message); touchStart.current = null; }}>
+        {state?.messages.map(message => <article className={`message ${message.senderName === name ? "mine" : ""}`} key={message.id} onTouchStart={event => { touchStart.current = { id: message.id, x: event.changedTouches[0].clientX }; pressTimer.current = window.setTimeout(() => setMenuMessage(message.id), 550); }} onTouchEnd={event => { if (pressTimer.current) window.clearTimeout(pressTimer.current); const start = touchStart.current; if (start?.id === message.id && Math.abs(event.changedTouches[0].clientX - start.x) > 55) startReply(message); touchStart.current = null; }}>
           <div className="message-meta"><span className="avatar">{message.senderName.slice(0, 1).toUpperCase()}</span><strong>{message.senderName}</strong><time>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time></div>
           <div className={`bubble ${message.kind !== "text" ? "media-bubble" : ""}`} onClick={event => { event.stopPropagation(); setMenuMessage(message.id); }} onContextMenu={event => { event.preventDefault(); setMenuMessage(message.id); }}>
             {message.replyToBody && <div className="reply-quote"><strong>{message.replyToSender}</strong><span>{message.replyToBody}</span></div>}
