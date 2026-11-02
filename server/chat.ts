@@ -12,6 +12,7 @@ type ChatPayload = {
   name?: string;
   text?: string;
   file?: { name?: string; type?: string; data?: string };
+  replyTo?: { id?: number; senderName?: string; body?: string };
 };
 
 function cleanName(value: unknown) {
@@ -83,6 +84,10 @@ export async function postChatMessage(payload: ChatPayload) {
   await db.insert(chatMessages).values({
     sessionId: session.id, senderName: name, kind, body: text || null,
     mediaUrl: mediaUrl ?? null, mediaName: mediaName ?? null, mediaType: mediaType ?? null,
+    replyToId: payload.replyTo?.id ?? null,
+    replyToSender: payload.replyTo?.senderName ? cleanName(payload.replyTo.senderName) : null,
+    replyToBody: payload.replyTo?.body ? cleanText(payload.replyTo.body) : null,
+    reactions: null,
   });
   const created = await db.select().from(chatMessages).where(eq(chatMessages.sessionId, session.id)).orderBy(asc(chatMessages.id));
   const message = normalizeMediaUrl(created[created.length - 1]);
@@ -101,11 +106,30 @@ export async function getMessagesSince(afterId: number) {
   return messages.map(normalizeMediaUrl);
 }
 
+export async function reactToMessage(messageId: number, name: string, emoji: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const safeName = cleanName(name);
+  const safeEmoji = String(emoji ?? "").slice(0, 8);
+  if (!safeName || !safeEmoji) throw new Error("Reaction is invalid");
+  const session = await activeSession();
+  if (!session) throw new Error("Unable to create chat session");
+  const rows = await db.select().from(chatMessages).where(and(eq(chatMessages.id, messageId), eq(chatMessages.sessionId, session.id))).limit(1);
+  const message = rows[0];
+  if (!message) throw new Error("Message not found");
+  const counts = message.reactions ? JSON.parse(message.reactions) as Record<string, number> : {};
+  counts[safeEmoji] = (counts[safeEmoji] ?? 0) + 1;
+  await db.update(chatMessages).set({ reactions: JSON.stringify(counts) }).where(eq(chatMessages.id, messageId));
+  broadcast({ type: "reaction", messageId, reactions: counts });
+  return counts;
+}
+
 function normalizeMediaUrl(message: typeof chatMessages.$inferSelect) {
+  const reactions = message?.reactions ? JSON.parse(message.reactions) as Record<string, number> : {};
   if (message?.mediaUrl?.startsWith("/manus-storage/")) {
-    return { ...message, mediaUrl: `/api/chat/media?key=${encodeURIComponent(message.mediaUrl.slice("/manus-storage/".length))}` };
+    return { ...message, reactions, mediaUrl: `/api/chat/media?key=${encodeURIComponent(message.mediaUrl.slice("/manus-storage/".length))}` };
   }
-  return message;
+  return { ...message, reactions };
 }
 
 export function addSubscriber(res: Response) {

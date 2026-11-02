@@ -27,6 +27,10 @@ export const chatMessages = mysqlTable("chat_messages", {
   mediaUrl: text("mediaUrl"),
   mediaName: varchar("mediaName", { length: 255 }),
   mediaType: varchar("mediaType", { length: 120 }),
+  replyToId: int("replyToId"),
+  replyToSender: varchar("replyToSender", { length: 80 }),
+  replyToBody: text("replyToBody"),
+  reactions: text("reactions"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

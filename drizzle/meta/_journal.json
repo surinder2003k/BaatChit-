@@ -15,6 +15,13 @@
       "when": 1793469287950,
       "tag": "0001_previous_shiver_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1793474248397,
+      "tag": "0002_peaceful_silver_samurai",
+      "breakpoints": true
     }
   ]
 }

@@ -7,7 +7,7 @@ import { publicPlatformScript } from "./publicConfig";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { addSubscriber, getChatState, getMessagesSince, postChatMessage } from "../chat";
+import { addSubscriber, getChatState, getMessagesSince, postChatMessage, reactToMessage } from "../chat";
 import { storageGetSignedUrl } from "../storage";
 
 async function startServer() {
@@ -36,6 +36,9 @@ async function startServer() {
   });
   app.post("/api/chat", async (req, res) => {
     try { res.json({ message: await postChatMessage(req.body) }); } catch (error) { res.status(400).json({ error: String(error).replace(/^Error: /, "") }); }
+  });
+  app.post("/api/chat/reaction", async (req, res) => {
+    try { res.json({ reactions: await reactToMessage(Number(req.body?.messageId), req.body?.name, req.body?.emoji) }); } catch (error) { res.status(400).json({ error: String(error).replace(/^Error: /, "") }); }
   });
   registerOAuthRoutes(app);
   // tRPC API
